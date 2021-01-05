@@ -10,9 +10,7 @@
 
 #include "main.h"
 
-extern I2C_HandleTypeDef hi2c3;
-
-#define DEVICE_ADDR 0x50 //Before Bit Shifting
+//#define DEVICE_ADDR 0x50 //Before Bit Shifting
 
 //writing
 #define WRITE_ENABLE 0x00
@@ -25,27 +23,43 @@ extern I2C_HandleTypeDef hi2c3;
 
 #define NAME_SIZE 3
 
-struct MemNode
+//Header management
+
+struct HeaderNode
 {
   char name[NAME_SIZE];
   uint8_t version;
-  uint16_t eAddress; //loc in eeprom
   uint16_t size;
+  uint16_t eAddress;
   void* ptr;
-  struct MemNode* next;
+  struct HeaderNode* next;
 };
 
-struct MemNode* memHead; //first node
+#define HEADER_SIZE 8 //bytes per header
+
+#define MAX_HEADER_COUNT 20 //8*20 160/4000 number of entries worth of space allocated
+
+//#define EEPROM_SIZE 4000 //bytes
 
 //macros
 #define SET_ADDRESS(address, write_en) (address << 1) | write_en
 
+void esetAddress(uint16_t addr);
 uint8_t eread(uint16_t addr);
-void ewrite(uint16_t addr, uint8_t val);
 void edownload(uint16_t from_addr, void* to_addr, uint16_t size);
+void ewrite(uint16_t addr, uint8_t val);
 void eupload(void* from_addr, uint16_t to_addr, uint16_t size);
 void edump(UART_HandleTypeDef huart);
 void eWipe();
-void includeStruct(void* ptr, uint16_t size, char name[], uint8_t version);
+struct HeaderNode* eAddToList();
+struct HeaderNode* findHeader(char name[]);
+void addHeaderEntry(struct HeaderNode* newHeader);
+void updateHeaderEntry(struct HeaderNode* header);
+void eLinkStruct(void* ptr, uint16_t size, char name[], uint8_t version);
+void loadHeaders();
+void sortHeaders();
+uint16_t eSpaceAvailable(uint16_t address);
+uint16_t emalloc(uint16_t size);
+void eInitialize();
 
 #endif

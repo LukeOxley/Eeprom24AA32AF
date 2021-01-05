@@ -96,6 +96,20 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   //eWipe();
+
+  eInitialize(hi2c3, 4000, 0x50);
+  uint8_t a = 10;
+  char aName[3] = "auu";
+  uint8_t b = 30;
+  char bName[3] = "buu";
+  uint8_t c = 60;
+  char cName[3] = "cuu";
+  eLinkStruct(&a, sizeof(a), aName, 2);
+  eLinkStruct(&b, sizeof(b), bName, 4);
+  eLinkStruct(&c, sizeof(c), cName, 1);
+  //ewrite(10,10);
+  //ewrite(50,50);
+  //ewrite(80,80);
   /* USER CODE END 2 */
 
   /* Infinite loop */
