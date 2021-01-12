@@ -9,9 +9,11 @@ with open("./putty.log",'r') as fid:
          break
 
       int_value = ord(byte_s)
-      row = [str(i), str(int_value)]
+      row = [str(i), str(int_value), str(chr(int_value))]
       csvwriter.writerow(row)
       #binary_string = '{0:08b}'.format(int_value)
       print(row)
 
 csvfile.close()
+
+a = input("enter to quit")
