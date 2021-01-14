@@ -11,50 +11,70 @@ struct HeaderNode* headerLast; //last node
 uint8_t g_numStructs; //number of entries in header
 
 I2C_HandleTypeDef* i2c01;
-uint16_t eepromSize;
-uint8_t device_addr;
+uint16_t g_eeprom_size;
+uint8_t g_device_addr;
 
 //sets 'cursor' in eeprom
-void esetAddress(uint16_t addr)
+void eSetAddress(uint16_t addr)
 {
   uint8_t timeout = 0;
 
   g_write_data[0] = addr >> 8;
   g_write_data[1] = addr & 0xFF;
 
-  ret = HAL_I2C_Master_Transmit(i2c01, SET_ADDRESS(device_addr, WRITE_ENABLE), g_write_data, 2, HAL_MAX_DELAY);
+  ret = HAL_I2C_Master_Transmit(i2c01, SET_ADDRESS(g_device_addr, WRITE_ENABLE), g_write_data, 2, HAL_MAX_DELAY);
+
+  if(ret != HAL_OK)
+  {
+    eErrorFound(COM_ERROR);
+  }
 
   for(timeout = 0; i2c01->State != HAL_I2C_STATE_READY && timeout < WRITE_TIMEOUT; timeout++)
   {
     //Wait for the send to stop
   }
+
+  if(timeout > WRITE_TIMEOUT)
+  {
+    eErrorFound(COM_TIMEOUT);
+  }
+
 }
 
 //reads single byte
-uint8_t eread(uint16_t addr)
+uint8_t eRead(uint16_t addr)
 {
   uint8_t value=6;
 
-  esetAddress(addr);
+  eSetAddress(addr);
 
-  ret = HAL_I2C_Master_Receive(i2c01, SET_ADDRESS(device_addr, READ_ENABLE), &value, 1, HAL_MAX_DELAY);
+  ret = HAL_I2C_Master_Receive(i2c01, SET_ADDRESS(g_device_addr, READ_ENABLE), &value, 1, HAL_MAX_DELAY);
 
-  HAL_Delay(20);
+  if(ret != HAL_OK)
+  {
+    eErrorFound(COM_ERROR);
+  }
+
+  HAL_Delay(5);
   return value;
 }
 
 //reads chunk of data
-void edownload(uint16_t from_addr, void* to_addr, uint16_t size)
+void eDownload(uint16_t from_addr, void* to_addr, uint16_t size)
 {
-  esetAddress(from_addr);
-  HAL_Delay(10);
-  ret = HAL_I2C_Master_Receive(i2c01, SET_ADDRESS(device_addr, READ_ENABLE), to_addr, size, HAL_MAX_DELAY);
+  eSetAddress(from_addr);
+  HAL_Delay(5);
+  ret = HAL_I2C_Master_Receive(i2c01, SET_ADDRESS(g_device_addr, READ_ENABLE), to_addr, size, HAL_MAX_DELAY);
 
-  HAL_Delay(20);
+  if(ret != HAL_OK)
+  {
+    eErrorFound(COM_ERROR);
+  }
+
 }
 
 //writes single byte
-void ewrite(uint16_t addr, uint8_t val)
+void eWrite(uint16_t addr, uint8_t val)
 {
   g_write_data[0] = addr >> 8;
   g_write_data[1] = addr & 0xFF;
@@ -63,11 +83,11 @@ void ewrite(uint16_t addr, uint8_t val)
 
   uint8_t timeout = 0;
   HAL_Delay(5);
-  ret = HAL_I2C_Master_Transmit(i2c01, SET_ADDRESS(device_addr, WRITE_ENABLE), g_write_data, 3, HAL_MAX_DELAY);
+  ret = HAL_I2C_Master_Transmit(i2c01, SET_ADDRESS(g_device_addr, WRITE_ENABLE), g_write_data, 3, HAL_MAX_DELAY);
 
   if(ret != HAL_OK)
   {
-     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+    eErrorFound(COM_ERROR);
   }
   for(timeout = 0; i2c01->State != HAL_I2C_STATE_READY && timeout < WRITE_TIMEOUT; timeout++)
       {
@@ -75,13 +95,13 @@ void ewrite(uint16_t addr, uint8_t val)
       }
   if(timeout > WRITE_TIMEOUT)
   {
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+    eErrorFound(COM_TIMEOUT);
   }
 
 }
 
 //uploads chunk ignoring page breaks
-void euploadRaw(void* from_addr, uint16_t to_addr, uint16_t size)
+void eUploadRaw(void* from_addr, uint16_t to_addr, uint16_t size)
 {
   //convert type to allow copying
   uint8_t* from = from_addr;
@@ -99,11 +119,11 @@ void euploadRaw(void* from_addr, uint16_t to_addr, uint16_t size)
   }
 
   HAL_Delay(5);
-  ret = HAL_I2C_Master_Transmit(i2c01, SET_ADDRESS(device_addr, WRITE_ENABLE), buff, size + 2, HAL_MAX_DELAY);
+  ret = HAL_I2C_Master_Transmit(i2c01, SET_ADDRESS(g_device_addr, WRITE_ENABLE), buff, size + 2, HAL_MAX_DELAY);
 
   if(ret != HAL_OK)
   {
-     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+     eErrorFound(COM_ERROR);
   }
 
   uint8_t timeout = 0;
@@ -114,14 +134,14 @@ void euploadRaw(void* from_addr, uint16_t to_addr, uint16_t size)
 
   if(timeout > WRITE_TIMEOUT)
   {
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+    eErrorFound(COM_TIMEOUT);
   }
 
   free(buff);
 }
 
 //breaks data into chunks to prevent crossing page boundary
-void eupload(void* from_addr, uint16_t to_addr, uint16_t size)
+void eUpload(void* from_addr, uint16_t to_addr, uint16_t size)
 {
   uint16_t next_boundary = (to_addr / PAGE_SIZE + 1) * PAGE_SIZE;
   uint16_t current_addr = to_addr;
@@ -140,8 +160,8 @@ void eupload(void* from_addr, uint16_t to_addr, uint16_t size)
       chunkSize = next_boundary - current_addr;
     }
 
-    euploadRaw(from + (current_addr - to_addr) ,current_addr , chunkSize);
-    HAL_Delay(20);
+    eUploadRaw(from + (current_addr - to_addr) ,current_addr , chunkSize);
+    HAL_Delay(5);
     current_addr += chunkSize;
     next_boundary = (current_addr / PAGE_SIZE + 1) * PAGE_SIZE;
   }while(current_addr < end_loc);
@@ -149,12 +169,12 @@ void eupload(void* from_addr, uint16_t to_addr, uint16_t size)
 }
 
 //transfers all values to given huart
-void edump(UART_HandleTypeDef huart)
+void eDump(UART_HandleTypeDef huart)
 {
   uint8_t MSG[33] = {'\0'};
-  for(uint16_t i = 0; i < eepromSize; i+=32)
+  for(uint16_t i = 0; i < g_eeprom_size; i+=32)
   {
-    edownload(i, MSG, 32);
+    eDownload(i, MSG, 32);
     HAL_UART_Transmit(&huart, MSG, sizeof(MSG)-1, 100);
     HAL_Delay(10);
   }
@@ -167,7 +187,7 @@ void eWipe()
 
   for(uint16_t i = 0; i < 4000; i+=32)
   {
-    eupload(data, i, 32);
+    eUpload(data, i, 32);
   }
 }
 
@@ -192,7 +212,7 @@ struct HeaderNode* eAddToList()
 }
 
 //returns null if none
-struct HeaderNode* findHeader(char name[])
+struct HeaderNode* eFindHeader(char name[])
 {
 
   struct HeaderNode* currentHeader = headerFirst;
@@ -213,27 +233,27 @@ struct HeaderNode* findHeader(char name[])
 }
 
 //adds Header to eeprom
-void addHeaderEntry(struct HeaderNode* newHeader)
+void eAddHeaderEntry(struct HeaderNode* newHeader)
 {
 
   g_numStructs += 1;
-  ewrite(0, g_numStructs); //increment struct num by 1
+  eWrite(0, g_numStructs); //increment struct num by 1
 
   if(g_numStructs > MAX_HEADER_COUNT)
   {
     //TODO max struct count reached D:
   }
 
-  newHeader->eAddress = emalloc(newHeader->size);
+  newHeader->eAddress = eMalloc(newHeader->size);
 
-  eupload(newHeader, (g_numStructs - 1) * HEADER_SIZE + 1, HEADER_SIZE);
+  eUpload(newHeader, (g_numStructs - 1) * HEADER_SIZE + 1, HEADER_SIZE);
 
-  sortHeaders(); //added new item, put it in place
+  eSortHeaders(); //added new item, put it in place
 
 }
 
 //finds location of header in eeprom and updates it
-void updateHeaderEntry(struct HeaderNode* header)
+void eUpdateHeaderEntry(struct HeaderNode* header)
 {
   //somehow find where its located
   //current process is slower due to searching through actual eeprom mem
@@ -244,11 +264,11 @@ void updateHeaderEntry(struct HeaderNode* header)
 
   for(int i = 0; i < g_numStructs; i++)
   {
-    edownload(i * HEADER_SIZE + 1, &nameFound, NAME_SIZE);
+    eDownload(i * HEADER_SIZE + 1, &nameFound, NAME_SIZE);
     if(strncmp(nameFound, header->name, NAME_SIZE) == 0)
     {
       //found the correct header to update
-      eupload(headerLoc + NAME_SIZE, i * HEADER_SIZE + 1 + NAME_SIZE, HEADER_SIZE - NAME_SIZE);
+      eUpload(headerLoc + NAME_SIZE, i * HEADER_SIZE + 1 + NAME_SIZE, HEADER_SIZE - NAME_SIZE);
       return;
     }
   }
@@ -260,13 +280,15 @@ void eLinkStruct(void* ptr, uint16_t size, char name[], uint8_t version, uint8_t
 {
   struct HeaderNode* node = NULL;
 
-  node = findHeader(name);
+  node = eFindHeader(name);
 
   if(version > MAX_VERSION) version = MAX_VERSION;
 
   uint8_t overwrite_previous;
   //if node found, extract overwrite bit from version
-  if(node != NULL) splitVersion(&(node->version), &overwrite_previous);
+  if(node != NULL) eSplitVersion(&(node->version), &overwrite_previous);
+
+  if(overwrite_protection != 0) overwrite_protection = 1;
 
   if(node == NULL)
   {
@@ -274,14 +296,14 @@ void eLinkStruct(void* ptr, uint16_t size, char name[], uint8_t version, uint8_t
     node = eAddToList();
     strcpy(node->name, name);
 
-    combineVersion(&version, &overwrite_protection);
+    eCombineVersion(&version, &overwrite_protection);
     node->version = version;
     node->size = size;
 
     node->ptr = ptr; //link
 
-    addHeaderEntry(node); //update eAddress too
-    eupload(node->ptr, node->eAddress, node->size);
+    eAddHeaderEntry(node); //update eAddress too
+    eUpload(node->ptr, node->eAddress, node->size);
 
   }else if(node->size != size || node->version != version)
   {
@@ -290,27 +312,27 @@ void eLinkStruct(void* ptr, uint16_t size, char name[], uint8_t version, uint8_t
     if(eSpaceAvailable(node->eAddress) < node->size)
     {
       //can't place struct here, move
-      node->eAddress = emalloc(node->size);
+      node->eAddress = eMalloc(node->size);
 
       //change of address, sort headers
-      sortHeaders();
+      eSortHeaders();
     }
 
-    combineVersion(&version, &overwrite_protection);
+    eCombineVersion(&version, &overwrite_protection);
     node->version = version;
     node->size = size;
 
     node->ptr = ptr; //link
 
-    updateHeaderEntry(node);
-    eupload(node->ptr, node->eAddress, node->size);
+    eUpdateHeaderEntry(node);
+    eUpload(node->ptr, node->eAddress, node->size);
 
   }else if(overwrite_previous != overwrite_protection)
   {
-    combineVersion(&version, &overwrite_protection);
+    eCombineVersion(&version, &overwrite_protection);
     node->version = version;
     node->ptr = ptr; //link
-    updateHeaderEntry(node);
+    eUpdateHeaderEntry(node);
 
   }else{
     //struct info matches that in eeprom
@@ -320,7 +342,7 @@ void eLinkStruct(void* ptr, uint16_t size, char name[], uint8_t version, uint8_t
 }
 
 //populate linked list with header info from eeprom
-void loadHeaders()
+void eLoadHeaders()
 {
 
   for(int i = 0; i < g_numStructs; i++)
@@ -339,13 +361,13 @@ void loadHeaders()
 
       headerLast = header;
 
-      edownload(i * HEADER_SIZE + 1, header, HEADER_SIZE);
+      eDownload(i * HEADER_SIZE + 1, header, HEADER_SIZE);
 
   }
 }
 
 //sort headers by increasing eaddress
-void sortHeaders()
+void eSortHeaders()
 {
   struct HeaderNode* prev;
   struct HeaderNode* current;
@@ -406,7 +428,7 @@ void sortHeaders()
 //returns available space to use at an address
 uint16_t eSpaceAvailable(uint16_t address)
 {
-  if(address > eepromSize){
+  if(address > g_eeprom_size){
     return 0;
   }
 
@@ -422,7 +444,7 @@ uint16_t eSpaceAvailable(uint16_t address)
     curr = curr->next;
   }
   //no headers with address after said address
-  return eepromSize - address;
+  return g_eeprom_size - address;
 
 }
 
@@ -430,7 +452,7 @@ uint16_t eSpaceAvailable(uint16_t address)
 null if not available, relies on the fact that
 the linked list is sorted by increasing
 eaddress*/
-uint16_t emalloc(uint16_t size)
+uint16_t eMalloc(uint16_t size)
 {
   if(g_numStructs > 1)
   {
@@ -453,7 +475,7 @@ uint16_t emalloc(uint16_t size)
     }
     //reached last entry, check is space between last and end of eeprom
 
-    if(eepromSize - current->eAddress + current->size >= size)
+    if(g_eeprom_size - current->eAddress + current->size >= size)
     {
       return current->eAddress + current->size;
     }
@@ -468,7 +490,7 @@ uint16_t emalloc(uint16_t size)
 }
 
 //removes header from linked list
-void removeFromList(char name[])
+void eRemoveFromList(char name[])
 {
 
   //remove from list
@@ -513,36 +535,36 @@ void removeFromList(char name[])
 }
 
 //everything necessary to remove an unused header
-void deleteHeader(char name[])
+void eDeleteHeader(char name[])
 {
   uint8_t header_buffer[HEADER_SIZE]; //stores last header entry in eeprom
   char name_buffer[NAME_SIZE];
 
-  removeFromList(name);
+  eRemoveFromList(name);
 
   //copy last header info into header_buffer
-  edownload((g_numStructs - 1) * HEADER_SIZE + 1, header_buffer, HEADER_SIZE);
+  eDownload((g_numStructs - 1) * HEADER_SIZE + 1, header_buffer, HEADER_SIZE);
 
   //find unused header pos and overwrite
   for(int i = 0; i < g_numStructs; i++)
   {
-    edownload(i * HEADER_SIZE + 1, &name_buffer, NAME_SIZE);
+    eDownload(i * HEADER_SIZE + 1, &name_buffer, NAME_SIZE);
     if(strncmp(name_buffer, name, NAME_SIZE) == 0)
     {
       //found the correct header to update
-      eupload(header_buffer, i * HEADER_SIZE + 1, HEADER_SIZE);
+      eUpload(header_buffer, i * HEADER_SIZE + 1, HEADER_SIZE);
       i = g_numStructs;
     }
   }
 
   //decrement num headers
   g_numStructs -= 1;
-  ewrite(0, g_numStructs);
+  eWrite(0, g_numStructs);
 
 }
 
 //removes unused headers (those without a linked pointer) from eeprom
-void cleanHeaders()
+void eCleanHeaders()
 {
 
   struct HeaderNode* currentNode = headerFirst;
@@ -563,7 +585,7 @@ void cleanHeaders()
 
       //unused header is currentNode, check for overwrite
       if(!(currentNode->version >> OVERWRITE_LOC)){
-        deleteHeader(currentNode->name);
+        eDeleteHeader(currentNode->name);
       }
 
     }
@@ -577,21 +599,21 @@ void cleanHeaders()
 void eInitialize(I2C_HandleTypeDef* i2c, uint16_t eepromSpace, uint8_t address)
 {
   i2c01 = i2c;
-  eepromSize = eepromSpace;
-  device_addr = address;
+  g_eeprom_size = eepromSpace;
+  g_device_addr = address;
 
 
-  g_numStructs = eread(0);
+  g_numStructs = eRead(0);
 
-  loadHeaders();
-  sortHeaders();
+  eLoadHeaders();
+  eSortHeaders();
 
   //eWipe();
 
 }
 
 //loads struct from mem, returns 1 if unknown struct
-uint8_t loadStruct(char name[])
+uint8_t eLoadStruct(char name[])
 {
   struct HeaderNode* current = headerFirst;
 
@@ -600,7 +622,7 @@ uint8_t loadStruct(char name[])
     if(strncmp(name, current->name, NAME_SIZE) == 0)
     {
       //found desired node
-      edownload(current->eAddress, current->ptr, current->size);
+      eDownload(current->eAddress, current->ptr, current->size);
       return 0;
     }
 
@@ -611,7 +633,7 @@ uint8_t loadStruct(char name[])
 }
 
 //saves struct to mem, returns 1 if unknown struct
-uint8_t saveStruct(char name[])
+uint8_t eSaveStruct(char name[])
 {
   struct HeaderNode* current = headerFirst;
 
@@ -620,7 +642,7 @@ uint8_t saveStruct(char name[])
     if(strncmp(name, current->name, NAME_SIZE) == 0)
     {
       //found desired node
-      eupload(current->ptr, current->eAddress, current->size);
+      eUpload(current->ptr, current->eAddress, current->size);
       return 0;
     }
 
@@ -631,19 +653,26 @@ uint8_t saveStruct(char name[])
 }
 
 //splits version into overwrite and version
-void splitVersion(uint8_t* version, uint8_t* overwrite)
+void eSplitVersion(uint8_t* version, uint8_t* overwrite)
 {
   *overwrite = *version >> OVERWRITE_LOC;
   *version = *version & OVERWRITE_MASK;
 }
 
 //combines overwrite with version
-void combineVersion(uint8_t* version, uint8_t* overwrite)
+void eCombineVersion(uint8_t* version, uint8_t* overwrite)
 {
   *version = *version | (*overwrite << OVERWRITE_LOC);
 }
-//TODO cleanHeaders (if any not being used, maybe erase them
-//overwrite with last header entry :) -> think through, be careful - sinc num header entries, will have a value in the linked list with a null ptr
 
-//TODO look at cushioning between data
+void eErrorFound(enum EEPROM_ERROR error)
+{
+  switch(error){
+    case COM_TIMEOUT:
 
+      break;
+    case COM_ERROR:
+      while(1);
+      break;
+  }
+}
