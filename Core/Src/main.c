@@ -111,13 +111,13 @@ int main(void)
   uint8_t d = 40;
   char dName[3] = "eed";
 
-  eLinkStruct(&a, sizeof(a), aName, 2, 0);
+  eLinkStruct(&a, sizeof(a), "eea", 2, 0);
   //eLinkStruct(&letters, sizeof(letters), lName, 1);
   //eLinkStruct(&b, sizeof(b), bName, 2, 1);
-  eLinkStruct(&c, sizeof(c), cName, 2, 0);
+  eLinkStruct(&c, sizeof(c), "eec", 2, 0);
 
-  eLinkStruct(&d, sizeof(d), dName, 2, 0);
-  cleanHeaders();
+  eLinkStruct(&d, sizeof(d), "eed", 2, 0);
+  eCleanHeaders();
 
   //ewrite(10,10);
   //ewrite(50,50);
@@ -131,7 +131,7 @@ int main(void)
 
     if(g_dump)
     {
-      edump(huart1);
+      eDump(huart1);
       g_dump = 0;
       HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
     }

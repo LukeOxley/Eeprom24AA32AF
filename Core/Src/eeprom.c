@@ -241,7 +241,7 @@ void eAddHeaderEntry(struct HeaderNode* newHeader)
 
   if(g_numStructs > MAX_HEADER_COUNT)
   {
-    //TODO max struct count reached D:
+    eErrorFound(MAX_HEADER);
   }
 
   newHeader->eAddress = eMalloc(newHeader->size);
@@ -480,6 +480,7 @@ uint16_t eMalloc(uint16_t size)
       return current->eAddress + current->size;
     }
 
+    eErrorFound(MAX_MEM);
     return NULL;//no space available
   }else
   {
@@ -669,9 +670,9 @@ void eErrorFound(enum EEPROM_ERROR error)
 {
   switch(error){
     case COM_TIMEOUT:
-
-      break;
     case COM_ERROR:
+    case MAX_HEADER:
+    case MAX_MEM:
       while(1);
       break;
   }

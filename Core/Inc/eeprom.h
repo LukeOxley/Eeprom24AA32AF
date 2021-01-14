@@ -44,7 +44,7 @@ struct HeaderNode
 #define MAX_VERSION 127
 
 //errors
-enum EEPROM_ERROR{COM_TIMEOUT, COM_ERROR};
+enum EEPROM_ERROR{COM_TIMEOUT, COM_ERROR, MAX_HEADER, MAX_MEM};
 
 //macros
 #define SET_ADDRESS(address, write_en) (address << 1) | write_en
@@ -69,7 +69,6 @@ void eInitialize(I2C_HandleTypeDef* i2c, uint16_t eepromSpace, uint8_t address);
 void eCleanHeaders();
 void eRemoveFromList(char name[]);
 void eDeleteHeader(char name[]);
-void eSetI2C(I2C_HandleTypeDef* i2c);
 uint8_t eLoadStruct(char name[]);
 uint8_t eSaveStruct(char name[]);
 void eSplitVersion(uint8_t* version, uint8_t* overwrite);
