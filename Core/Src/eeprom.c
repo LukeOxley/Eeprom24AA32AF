@@ -14,6 +14,25 @@ I2C_HandleTypeDef* i2c01;
 uint16_t g_eeprom_size;
 uint8_t g_device_addr;
 
+static void eSetAddress(uint16_t addr);
+static uint8_t eRead(uint16_t addr);
+static void eDownload(uint16_t from_addr, void* to_addr, uint16_t size);
+static void eWrite(uint16_t addr, uint8_t val);
+static void eUpload(void* from_addr, uint16_t to_addr, uint16_t size);
+static struct HeaderNode* eAddToList();
+static struct HeaderNode* eFindHeader(char name[]);
+static void eAddHeaderEntry(struct HeaderNode* newHeader);
+static void eUpdateHeaderEntry(struct HeaderNode* header);
+static void eSortHeaders();
+static uint16_t eSpaceAvailable(uint16_t address);
+static uint16_t eMalloc(uint16_t size);
+static void eRemoveFromList(char name[]);
+static void eDeleteHeader(char name[]);
+static void eSplitVersion(uint8_t* version, uint8_t* overwrite);
+static void eCombineVersion(uint8_t* version, uint8_t* overwrite);
+static void eErrorFound(enum EEPROM_ERROR error);
+static void eLoadHeaders();
+
 //sets 'cursor' in eeprom
 void eSetAddress(uint16_t addr)
 {
@@ -570,8 +589,6 @@ void eCleanHeaders()
 
   struct HeaderNode* currentNode = headerFirst;
   struct HeaderNode* nextNode = headerFirst->next;
-  char name_buffer[NAME_SIZE];
-  uint8_t header_buffer[HEADER_SIZE];
 
   uint8_t currentNum = g_numStructs;
 

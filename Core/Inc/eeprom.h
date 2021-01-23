@@ -49,30 +49,12 @@ enum EEPROM_ERROR{COM_TIMEOUT, COM_ERROR, MAX_HEADER, MAX_MEM};
 //macros
 #define SET_ADDRESS(address, write_en) (address << 1) | write_en
 
-void eSetAddress(uint16_t addr);
-uint8_t eRead(uint16_t addr);
-void eDownload(uint16_t from_addr, void* to_addr, uint16_t size);
-void eWrite(uint16_t addr, uint8_t val);
-void eUpload(void* from_addr, uint16_t to_addr, uint16_t size);
 void eDump(UART_HandleTypeDef huart);
 void eWipe();
-struct HeaderNode* eAddToList();
-struct HeaderNode* eFindHeader(char name[]);
-void eAddHeaderEntry(struct HeaderNode* newHeader);
-void eUpdateHeaderEntry(struct HeaderNode* header);
 void eLinkStruct(void* ptr, uint16_t size, char name[], uint8_t version, uint8_t overwrite);
-void eLoadHeaders();
-void eSortHeaders();
-uint16_t eSpaceAvailable(uint16_t address);
-uint16_t eMalloc(uint16_t size);
 void eInitialize(I2C_HandleTypeDef* i2c, uint16_t eepromSpace, uint8_t address);
 void eCleanHeaders();
-void eRemoveFromList(char name[]);
-void eDeleteHeader(char name[]);
 uint8_t eLoadStruct(char name[]);
 uint8_t eSaveStruct(char name[]);
-void eSplitVersion(uint8_t* version, uint8_t* overwrite);
-void eCombineVersion(uint8_t* version, uint8_t* overwrite);
-void eErrorFound(enum EEPROM_ERROR error);
 
 #endif
