@@ -98,8 +98,6 @@ int main(void)
 
 
 
-  char letters[10] = "hello luke";
-  char lName[3] = "leg";
 
   eInitialize(&hi2c3, 4000, 0x50);
   uint8_t a = 10;
@@ -110,13 +108,16 @@ int main(void)
   char cName[3] = "eec";
   uint8_t d = 40;
   char dName[3] = "eed";
+  uint8_t numList[] = {65,65,65,65,64,64,64,64,64,6,464,6,6,6,6,5};
+  uint8_t backList[] = {420,420,420};
+  char letters[] = "Howdy partner, I hope you are swell";
 
-  eLinkStruct(&a, sizeof(a), "eea", 2, 0);
+  eLinkStruct(&letters, sizeof(letters), "haj", 1, 0);
   //eLinkStruct(&letters, sizeof(letters), lName, 1);
-  //eLinkStruct(&b, sizeof(b), bName, 2, 1);
-  eLinkStruct(&c, sizeof(c), "eec", 2, 0);
+  //eLinkStruct(&b, sizeof(b), bName, 2, 0);
+  eLinkStruct(&numList, sizeof(numList), "bup", 1, 0);
 
-  eLinkStruct(&d, sizeof(d), "eed", 2, 0);
+  eLinkStruct(&backList, sizeof(backList), "fgh", 15, 0);
   eCleanHeaders();
 
   //ewrite(10,10);
