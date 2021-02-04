@@ -6,8 +6,7 @@
 uint8_t g_write_data[4];
 HAL_StatusTypeDef ret;
 
-struct HeaderNode *headerFirst; //first node
-struct HeaderNode *headerLast;  //last node
+header_t g_headers[MAX_HEADER_COUNT] = {NULL};
 
 uint8_t g_numStructs; //number of entries in header
 
@@ -20,18 +19,16 @@ uint8_t readByte(uint16_t addr);
 void downloadChunk(uint16_t from_addr, void *to_addr, uint16_t size);
 void uploadByte(uint16_t addr, uint8_t val);
 void uploadChunk(void *from_addr, uint16_t to_addr, uint16_t size);
-struct HeaderNode *eAddToList();
-struct HeaderNode *eFindHeader(char name[]);
-void addHeaderEntry(struct HeaderNode *newHeader);
-void updateHeaderEntry(struct HeaderNode *header);
+header_t *findHeader(char name[]);
+void addHeaderEntry(header_t *newHeader);
+void updateHeaderEntry(header_t *header);
 void sortHeaders();
 uint16_t spaceAvailable(uint16_t address);
 uint16_t eepromMalloc(uint16_t size);
-void removeHeaderFromList(char name[]);
-void deleteHeader(char name[]);
+void removeFromEeprom(char name[]);
 void splitVersion(uint8_t *version, uint8_t *overwrite);
 void combineVersion(uint8_t *version, uint8_t *overwrite);
-void errorFound(enum EEPROM_ERROR error);
+void errorFound(eeprom_error_t error);
 void loadHeaderEntries();
 
 //sets 'cursor' in eeprom
@@ -207,51 +204,24 @@ void eepromWipe()
   }
 }
 
-//adds header node, returns pointer
-struct HeaderNode *eAddToList()
-{
-  struct HeaderNode *newNode = malloc(sizeof(struct HeaderNode));
-
-  newNode->next = NULL;
-
-  //For first node in list
-  if (NULL == headerFirst)
-  {
-    headerFirst = newNode;
-  }
-  else
-  {
-    headerLast->next = newNode;
-  }
-
-  headerLast = newNode;
-
-  return newNode;
-}
-
 //returns null if none
-struct HeaderNode *eFindHeader(char name[])
+header_t *findHeader(char name[])
 {
-
-  struct HeaderNode *currentHeader = headerFirst;
 
   //search through headers until name match
   for (int i = 0; i < g_numStructs; i++)
   {
-
-    if (strncmp(name, currentHeader->name, NAME_SIZE) == 0)
+    if (strncmp(name, g_headers[i].name, NAME_SIZE) == 0)
     {
-      return currentHeader;
+      return &g_headers[i];
     }
-
-    currentHeader = currentHeader->next;
   }
 
   return NULL;
 }
 
 //adds Header to eeprom
-void addHeaderEntry(struct HeaderNode *newHeader)
+void addHeaderEntry(header_t *new_header)
 {
 
   g_numStructs += 1;
@@ -261,188 +231,139 @@ void addHeaderEntry(struct HeaderNode *newHeader)
   {
     errorFound(MAX_HEADER);
   }
+  new_header->address_on_eeprom = eepromMalloc(new_header->size);
 
-  newHeader->address_on_eeprom = eepromMalloc(newHeader->size);
-
-  uploadChunk(newHeader, (g_numStructs - 1) * HEADER_SIZE + 1, HEADER_SIZE);
+  uploadChunk(new_header, (g_numStructs - 1) * HEADER_SIZE + 1, HEADER_SIZE);
 
   sortHeaders(); //added new item, put it in place
 }
 
 //finds location of header in eeprom and updates it
-void updateHeaderEntry(struct HeaderNode *header)
+void updateHeaderEntry(header_t *header)
 {
   //somehow find where its located
   //current process is slower due to searching through actual eeprom mem
-  char nameFound[NAME_SIZE];
+  char name_found[NAME_SIZE];
 
   //converting allows for pointer addition
-  uint8_t *headerLoc = header;
+  uint8_t *header_loc = (uint8_t*) header;
 
   for (int i = 0; i < g_numStructs; i++)
   {
-    downloadChunk(i * HEADER_SIZE + 1, &nameFound, NAME_SIZE);
-    if (strncmp(nameFound, header->name, NAME_SIZE) == 0)
+    downloadChunk(i * HEADER_SIZE + 1, &name_found, NAME_SIZE);
+    if (strncmp(name_found, header->name, NAME_SIZE) == 0)
     {
       //found the correct header to update
-      uploadChunk(headerLoc + NAME_SIZE, i * HEADER_SIZE + 1 + NAME_SIZE, HEADER_SIZE - NAME_SIZE);
+      uploadChunk(header_loc + NAME_SIZE, i * HEADER_SIZE + 1 + NAME_SIZE, HEADER_SIZE - NAME_SIZE);
       return;
     }
   }
   //header not found, should never reach this point...
+  errorFound(HEADER_NOT_FOUND);
 }
 
 //links struct ptr with a header from eeprom, overwrite protect active high
 void eepromLinkStruct(void *ptr, uint16_t size, char name[], uint8_t version, uint8_t overwrite_protection)
 {
-  struct HeaderNode *node = NULL;
+  header_t *a_header = NULL;
 
-  node = eFindHeader(name);
+  a_header = findHeader(name);
 
   if (version > MAX_VERSION)
+  {
     version = MAX_VERSION;
+  }
 
   uint8_t overwrite_previous;
   //if node found, extract overwrite bit from version
-  if (node != NULL)
-    splitVersion(&(node->version), &overwrite_previous);
+  if (a_header != NULL)
+  {
+    splitVersion(&(a_header->version), &overwrite_previous);
+  }
 
   if (overwrite_protection != 0)
+  {
     overwrite_protection = 1;
+  }
 
-  if (node == NULL)
+  if (a_header == NULL)
   {
     //struct not in eeprom in any form
-    node = eAddToList();
-    strcpy(node->name, name);
+    a_header = &g_headers[g_numStructs]; //0 based list, no +1
+    strcpy(a_header->name, name);
 
     combineVersion(&version, &overwrite_protection);
-    node->version = version;
-    node->size = size;
+    a_header->version = version;
+    a_header->size = size;
 
-    node->ptr_to_data = ptr; //link
+    a_header->ptr_to_data = ptr; //link :D
 
-    addHeaderEntry(node); //update eAddress too
-    uploadChunk(node->ptr_to_data, node->address_on_eeprom, node->size);
+    addHeaderEntry(a_header); //update eAddress too
+    uploadChunk(a_header->ptr_to_data, a_header->address_on_eeprom, a_header->size);
   }
-  else if (node->size != size || node->version != version)
+  else if (a_header->size != size || a_header->version != version)
   {
     //overwrite and header change
 
-    if (spaceAvailable(node->address_on_eeprom) < node->size)
+    if (spaceAvailable(a_header->address_on_eeprom) < a_header->size)
     {
       //can't place struct here, move
-      node->address_on_eeprom = eepromMalloc(node->size);
+      a_header->address_on_eeprom = eepromMalloc(a_header->size);
 
-      //change of address, sort headers
+      //change of address, sort g_headers
       sortHeaders();
     }
 
     combineVersion(&version, &overwrite_protection);
-    node->version = version;
-    node->size = size;
+    a_header->version = version;
+    a_header->size = size;
 
-    node->ptr_to_data = ptr; //link
+    a_header->ptr_to_data = ptr; //link :D
 
-    updateHeaderEntry(node);
-    uploadChunk(node->ptr_to_data, node->address_on_eeprom, node->size);
+    updateHeaderEntry(a_header);
+    uploadChunk(a_header->ptr_to_data, a_header->address_on_eeprom, a_header->size);
   }
   else if (overwrite_previous != overwrite_protection)
   {
     combineVersion(&version, &overwrite_protection);
-    node->version = version;
-    node->ptr_to_data = ptr; //link
-    updateHeaderEntry(node);
+    a_header->version = version;
+    a_header->ptr_to_data = ptr; //link :D
+    updateHeaderEntry(a_header);
   }
   else
   {
     //struct info matches that in eeprom
-    node->ptr_to_data = ptr; //link
+    a_header->ptr_to_data = ptr; //link :D
   }
 }
 
 //populate linked list with header info from eeprom
 void loadHeaderEntries()
 {
-
   for (int i = 0; i < g_numStructs; i++)
   {
-    struct HeaderNode *header = malloc(sizeof(struct HeaderNode));
-    header->next = NULL;
-    header->ptr_to_data = NULL;
-
-    if (headerFirst == NULL)
-    {
-      headerFirst = header;
-    }
-    else
-    {
-      headerLast->next = header;
-    }
-
-    headerLast = header;
-
-    downloadChunk(i * HEADER_SIZE + 1, header, HEADER_SIZE);
+    downloadChunk(i * HEADER_SIZE + 1, &g_headers[i], HEADER_SIZE);
   }
 }
 
 //sort headers by increasing eaddress
 void sortHeaders()
 {
-  struct HeaderNode *prev;
-  struct HeaderNode *current;
-  struct HeaderNode *future;
+  header_t *sort_location = g_headers;
+  header_t temp; //temporary buffer
 
-  uint8_t swapped = 0;
-
-  if (g_numStructs > 1)
+  for (int i = 0; i < g_numStructs; i++)
   {
-
-    do
+    for (int j = 0; j < g_numStructs - i - 1; j++)
     {
-      prev = NULL;
-      current = headerFirst;
-      swapped = 0;
-
-      for (int i = 0; i < g_numStructs - 1; i++) //(current->next != NULL)
+      if (sort_location->address_on_eeprom > (sort_location + 1)->address_on_eeprom)
       {
-
-        future = current->next;
-
-        if (current->address_on_eeprom > future->address_on_eeprom)
-        {
-          swapped = 1;
-          if (prev == NULL)
-          {
-            current->next = future->next;
-            future->next = current;
-            headerFirst = future;
-
-            prev = headerFirst;
-          }
-          else
-          {
-            prev->next = future;
-            current->next = future->next;
-            future->next = current;
-
-            prev = prev->next;
-            //current=prev->next;
-          }
-        }
-        else
-        {
-          prev = current;
-          current = current->next;
-        }
+        temp = *sort_location;
+        *sort_location = *(sort_location + 1);
+        *(sort_location + 1) = temp;
       }
-
-      if (current != NULL)
-      {
-        headerLast = current;
-      }
-
-    } while (swapped);
+      sort_location++;
+    }
   }
 }
 
@@ -455,15 +376,12 @@ uint16_t spaceAvailable(uint16_t address)
   }
 
   //find header with first address greater than eAddress
-  struct HeaderNode *curr = headerFirst;
-  while (curr != NULL)
+  for (int i = 0; i < g_numStructs; i++)
   {
-    if (curr->address_on_eeprom > address)
+    if (g_headers[i].address_on_eeprom > address)
     {
-      return curr->address_on_eeprom - address;
+      return g_headers[i].address_on_eeprom - address;
     }
-
-    curr = curr->next;
   }
   //no headers with address after said address
   return g_eeprom_size - address;
@@ -477,28 +395,27 @@ uint16_t eepromMalloc(uint16_t size)
 {
   if (g_numStructs > 1)
   {
-    struct HeaderNode *current = headerFirst;
+//    header_t *current = g_headers;
 
     //check between end of headers and first node
-    if (headerFirst->address_on_eeprom - (MAX_HEADER_COUNT * HEADER_SIZE + 1) >= size)
+    if (g_headers->address_on_eeprom - (MAX_HEADER_COUNT * HEADER_SIZE + 1) >= size)
     {
       return MAX_HEADER_COUNT * HEADER_SIZE + 1;
     }
 
     //check between individual nodes
-    while (current->next != NULL)
+    for (int i = 0; i < g_numStructs - 1; i++)
     {
-      if (current->next->address_on_eeprom - (current->address_on_eeprom + current->size) >= size)
+      if (g_headers[i + 1].address_on_eeprom - (g_headers[i].address_on_eeprom + g_headers[i].size) >= size)
       {
-        return current->address_on_eeprom + current->size;
+        return g_headers[i].address_on_eeprom + g_headers[i].size;
       }
-      current = current->next;
     }
     //reached last entry, check is space between last and end of eeprom
 
-    if (g_eeprom_size - current->address_on_eeprom + current->size >= size)
+    if (g_eeprom_size - g_headers[g_numStructs].address_on_eeprom + g_headers[g_numStructs].size >= size)
     {
-      return current->address_on_eeprom + current->size;
+      return g_headers[g_numStructs].address_on_eeprom + g_headers[g_numStructs].size;
     }
 
     errorFound(MAX_MEM);
@@ -510,75 +427,31 @@ uint16_t eepromMalloc(uint16_t size)
   }
 }
 
-//removes header from linked list
-void removeHeaderFromList(char name[])
+//remove header from eeprom
+void removeFromEeprom(char name[])
 {
+  // This function finds the last header entry in
+  // eeprom and overwrites the one to be deleted
 
-  //remove from list
-  struct HeaderNode *currentNode = headerFirst;
-  struct HeaderNode *bufferNode;
-
-  if (strncmp(headerFirst->name, name, NAME_SIZE) == 0)
-  {
-    //first in list is match
-    bufferNode = headerFirst;
-    headerFirst = headerFirst->next;
-    free(bufferNode);
-  }
-  else if (strncmp(headerLast->name, name, NAME_SIZE) == 0)
-  {
-    //last in list is match
-
-    //get second to last node
-    for (int i = 0; i < g_numStructs - 2; i++)
-    {
-      currentNode = currentNode->next;
-    }
-
-    headerLast = currentNode;
-    free(headerLast->next);
-    headerLast->next = NULL;
-  }
-  else
-  {
-    for (int i = 0; i < g_numStructs - 2; i++)
-    {
-      if (strncmp(currentNode->next->name, name, NAME_SIZE) == 0)
-      {
-        free(currentNode->next);
-        currentNode->next = currentNode->next->next; //skip over deleted node
-        i = g_numStructs;
-      }
-
-      currentNode = currentNode->next;
-    }
-  }
-}
-
-//everything necessary to remove an unused header
-void deleteHeader(char name[])
-{
   uint8_t header_buffer[HEADER_SIZE]; //stores last header entry in eeprom
   char name_buffer[NAME_SIZE];
 
-  removeHeaderFromList(name);
-
-  //copy last header info into header_buffer
+  // copy last header info into header_buffer
   downloadChunk((g_numStructs - 1) * HEADER_SIZE + 1, header_buffer, HEADER_SIZE);
 
-  //find unused header pos and overwrite
+  // find unused header pos and overwrite
   for (int i = 0; i < g_numStructs; i++)
   {
     downloadChunk(i * HEADER_SIZE + 1, &name_buffer, NAME_SIZE);
     if (strncmp(name_buffer, name, NAME_SIZE) == 0)
     {
-      //found the correct header to update
+      // found the correct header to update
       uploadChunk(header_buffer, i * HEADER_SIZE + 1, HEADER_SIZE);
-      i = g_numStructs;
+      i = g_numStructs; // exit loop
     }
   }
 
-  //decrement num headers
+  // decrement num g_headers
   g_numStructs -= 1;
   uploadByte(0, g_numStructs);
 }
@@ -587,28 +460,20 @@ void deleteHeader(char name[])
 void eepromCleanHeaders()
 {
 
-  struct HeaderNode *currentNode = headerFirst;
-  struct HeaderNode *nextNode = headerFirst->next;
-
-  uint8_t currentNum = g_numStructs;
-
-  for (int i = 0; i < currentNum; i++)
+  for (int i = 0; i < g_numStructs; i++)
   {
-    //must save next node before deletion
-    //since current node will be removed
-    nextNode = currentNode->next;
-
-    if (currentNode->ptr_to_data == NULL)
+    if (g_headers[i].ptr_to_data == NULL && !(g_headers[i].version >> OVERWRITE_BIT))
     {
+      //unused header and no overwrite
+      //DECREMENTS G_NUM_STRUCTS
+      removeFromEeprom(g_headers[i].name);
 
-      //unused header is currentNode, check for overwrite
-      if (!(currentNode->version >> OVERWRITE_LOC))
+      //move headers back one to fill gap
+      for (int j = i; j < g_numStructs; j++)
       {
-        deleteHeader(currentNode->name);
+        g_headers[j] = g_headers[j + 1]; //intended to reach 1+
       }
     }
-
-    currentNode = nextNode;
   }
 }
 
@@ -630,18 +495,15 @@ void eepromInitialize(I2C_HandleTypeDef *i2c, uint16_t eepromSpace, uint8_t addr
 //loads struct from mem, returns 1 if unknown struct
 uint8_t eepromLoadStruct(char name[])
 {
-  struct HeaderNode *current = headerFirst;
 
   for (int i = 0; i < g_numStructs; i++)
   {
-    if (strncmp(name, current->name, NAME_SIZE) == 0)
+    if (strncmp(name, g_headers[i].name, NAME_SIZE) == 0)
     {
       //found desired node
-      downloadChunk(current->address_on_eeprom, current->ptr_to_data, current->size);
+      downloadChunk(g_headers[i].address_on_eeprom, g_headers[i].ptr_to_data, g_headers[i].size);
       return 0;
     }
-
-    current = current->next;
   }
 
   return 1;
@@ -650,18 +512,15 @@ uint8_t eepromLoadStruct(char name[])
 //saves struct to mem, returns 1 if unknown struct
 uint8_t eepromSaveStruct(char name[])
 {
-  struct HeaderNode *current = headerFirst;
 
   for (int i = 0; i < g_numStructs; i++)
   {
-    if (strncmp(name, current->name, NAME_SIZE) == 0)
+    if (strncmp(name, g_headers[i].name, NAME_SIZE) == 0)
     {
       //found desired node
-      uploadChunk(current->ptr_to_data, current->address_on_eeprom, current->size);
+      uploadChunk(g_headers[i].ptr_to_data, g_headers[i].address_on_eeprom, g_headers[i].size);
       return 0;
     }
-
-    current = current->next;
   }
 
   return 1;
@@ -670,17 +529,17 @@ uint8_t eepromSaveStruct(char name[])
 //splits version into overwrite and version
 void splitVersion(uint8_t *version, uint8_t *overwrite)
 {
-  *overwrite = *version >> OVERWRITE_LOC;
+  *overwrite = *version >> OVERWRITE_BIT;
   *version = *version & OVERWRITE_MASK;
 }
 
 //combines overwrite with version
 void combineVersion(uint8_t *version, uint8_t *overwrite)
 {
-  *version = *version | (*overwrite << OVERWRITE_LOC);
+  *version = *version | (*overwrite << OVERWRITE_BIT);
 }
 
-void errorFound(enum EEPROM_ERROR error)
+void errorFound(eeprom_error_t error)
 {
   switch (error)
   {
@@ -688,6 +547,7 @@ void errorFound(enum EEPROM_ERROR error)
   case COM_ERROR:
   case MAX_HEADER:
   case MAX_MEM:
+  case HEADER_NOT_FOUND:
     while (1)
       ;
     break;

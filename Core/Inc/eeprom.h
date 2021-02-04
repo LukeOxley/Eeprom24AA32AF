@@ -31,7 +31,7 @@ typedef struct {
   uint16_t size;
   uint16_t address_on_eeprom;
   void* ptr_to_data;
-} Header_node_t;
+} header_t;
 
 #define HEADER_SIZE 8 //bytes per header
 
@@ -46,8 +46,9 @@ typedef enum{
   COM_TIMEOUT,
   COM_ERROR,
   MAX_HEADER,
-  MAX_MEM
-} EEPROM_error_t;
+  MAX_MEM,
+  HEADER_NOT_FOUND
+} eeprom_error_t;
 
 //macros
 #define SET_ADDRESS(address, write_en) ((address << 1) | write_en)
