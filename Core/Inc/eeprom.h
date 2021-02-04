@@ -49,16 +49,15 @@ typedef enum{
   MAX_MEM
 } EEPROM_error_t;
 
-
 //macros
-#define SET_ADDRESS(address, write_en) (address << 1) | write_en
+#define SET_ADDRESS(address, write_en) ((address << 1) | write_en)
 
-void eDump(UART_HandleTypeDef huart);
-void eWipe();
-void eLinkStruct(void* ptr, uint16_t size, char name[], uint8_t version, uint8_t overwrite);
-void eInitialize(I2C_HandleTypeDef* i2c, uint16_t eepromSpace, uint8_t address);
-void eCleanHeaders();
-uint8_t eLoadStruct(char name[]);
-uint8_t eSaveStruct(char name[]);
+void eepromDump(UART_HandleTypeDef huart);
+void eepromWipe();
+void eepromLinkStruct(void* ptr, uint16_t size, char name[], uint8_t version, uint8_t overwrite);
+void eepromInitialize(I2C_HandleTypeDef* i2c, uint16_t eepromSpace, uint8_t address);
+void eepromCleanHeaders();
+uint8_t eepromLoadStruct(char name[]);
+uint8_t eepromSaveStruct(char name[]);
 
 #endif
