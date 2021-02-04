@@ -25,26 +25,30 @@
 
 //Header management
 
-struct HeaderNode
-{
+typedef struct {
   char name[NAME_SIZE];
   uint8_t version;
   uint16_t size;
-  uint16_t eAddress;
-  void* ptr;
-  struct HeaderNode* next;
-};
+  uint16_t address_on_eeprom;
+  void* ptr_to_data;
+} Header_node_t;
 
 #define HEADER_SIZE 8 //bytes per header
 
-#define MAX_HEADER_COUNT 20 //8*20 160/4000 number of entries worth of space allocated
+#define MAX_HEADER_COUNT 20 //8*20 -> 160/4000 number of entries worth of space allocated
 
-#define OVERWRITE_LOC 7
+#define OVERWRITE_BIT 7
 #define OVERWRITE_MASK 0b01111111
 #define MAX_VERSION 127
 
 //errors
-enum EEPROM_ERROR{COM_TIMEOUT, COM_ERROR, MAX_HEADER, MAX_MEM};
+typedef enum{
+  COM_TIMEOUT,
+  COM_ERROR,
+  MAX_HEADER,
+  MAX_MEM
+} EEPROM_error_t;
+
 
 //macros
 #define SET_ADDRESS(address, write_en) (address << 1) | write_en

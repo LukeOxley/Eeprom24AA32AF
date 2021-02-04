@@ -262,7 +262,7 @@ void eAddHeaderEntry(struct HeaderNode *newHeader)
     eErrorFound(MAX_HEADER);
   }
 
-  newHeader->eAddress = eMalloc(newHeader->size);
+  newHeader->address_on_eeprom = eMalloc(newHeader->size);
 
   eUpload(newHeader, (g_numStructs - 1) * HEADER_SIZE + 1, HEADER_SIZE);
 
@@ -320,19 +320,19 @@ void eLinkStruct(void *ptr, uint16_t size, char name[], uint8_t version, uint8_t
     node->version = version;
     node->size = size;
 
-    node->ptr = ptr; //link
+    node->ptr_to_data = ptr; //link
 
     eAddHeaderEntry(node); //update eAddress too
-    eUpload(node->ptr, node->eAddress, node->size);
+    eUpload(node->ptr_to_data, node->address_on_eeprom, node->size);
   }
   else if (node->size != size || node->version != version)
   {
     //overwrite and header change
 
-    if (eSpaceAvailable(node->eAddress) < node->size)
+    if (eSpaceAvailable(node->address_on_eeprom) < node->size)
     {
       //can't place struct here, move
-      node->eAddress = eMalloc(node->size);
+      node->address_on_eeprom = eMalloc(node->size);
 
       //change of address, sort headers
       eSortHeaders();
@@ -342,22 +342,22 @@ void eLinkStruct(void *ptr, uint16_t size, char name[], uint8_t version, uint8_t
     node->version = version;
     node->size = size;
 
-    node->ptr = ptr; //link
+    node->ptr_to_data = ptr; //link
 
     eUpdateHeaderEntry(node);
-    eUpload(node->ptr, node->eAddress, node->size);
+    eUpload(node->ptr_to_data, node->address_on_eeprom, node->size);
   }
   else if (overwrite_previous != overwrite_protection)
   {
     eCombineVersion(&version, &overwrite_protection);
     node->version = version;
-    node->ptr = ptr; //link
+    node->ptr_to_data = ptr; //link
     eUpdateHeaderEntry(node);
   }
   else
   {
     //struct info matches that in eeprom
-    node->ptr = ptr; //link
+    node->ptr_to_data = ptr; //link
   }
 }
 
@@ -369,7 +369,7 @@ void eLoadHeaders()
   {
     struct HeaderNode *header = malloc(sizeof(struct HeaderNode));
     header->next = NULL;
-    header->ptr = NULL;
+    header->ptr_to_data = NULL;
 
     if (headerFirst == NULL)
     {
@@ -409,7 +409,7 @@ void eSortHeaders()
 
         future = current->next;
 
-        if (current->eAddress > future->eAddress)
+        if (current->address_on_eeprom > future->address_on_eeprom)
         {
           swapped = 1;
           if (prev == NULL)
@@ -458,9 +458,9 @@ uint16_t eSpaceAvailable(uint16_t address)
   struct HeaderNode *curr = headerFirst;
   while (curr != NULL)
   {
-    if (curr->eAddress > address)
+    if (curr->address_on_eeprom > address)
     {
-      return curr->eAddress - address;
+      return curr->address_on_eeprom - address;
     }
 
     curr = curr->next;
@@ -480,7 +480,7 @@ uint16_t eMalloc(uint16_t size)
     struct HeaderNode *current = headerFirst;
 
     //check between end of headers and first node
-    if (headerFirst->eAddress - (MAX_HEADER_COUNT * HEADER_SIZE + 1) >= size)
+    if (headerFirst->address_on_eeprom - (MAX_HEADER_COUNT * HEADER_SIZE + 1) >= size)
     {
       return MAX_HEADER_COUNT * HEADER_SIZE + 1;
     }
@@ -488,17 +488,17 @@ uint16_t eMalloc(uint16_t size)
     //check between individual nodes
     while (current->next != NULL)
     {
-      if (current->next->eAddress - (current->eAddress + current->size) >= size)
+      if (current->next->address_on_eeprom - (current->address_on_eeprom + current->size) >= size)
       {
-        return current->eAddress + current->size;
+        return current->address_on_eeprom + current->size;
       }
       current = current->next;
     }
     //reached last entry, check is space between last and end of eeprom
 
-    if (g_eeprom_size - current->eAddress + current->size >= size)
+    if (g_eeprom_size - current->address_on_eeprom + current->size >= size)
     {
-      return current->eAddress + current->size;
+      return current->address_on_eeprom + current->size;
     }
 
     eErrorFound(MAX_MEM);
@@ -598,7 +598,7 @@ void eCleanHeaders()
     //since current node will be removed
     nextNode = currentNode->next;
 
-    if (currentNode->ptr == NULL)
+    if (currentNode->ptr_to_data == NULL)
     {
 
       //unused header is currentNode, check for overwrite
@@ -637,7 +637,7 @@ uint8_t eLoadStruct(char name[])
     if (strncmp(name, current->name, NAME_SIZE) == 0)
     {
       //found desired node
-      eDownload(current->eAddress, current->ptr, current->size);
+      eDownload(current->address_on_eeprom, current->ptr_to_data, current->size);
       return 0;
     }
 
@@ -657,7 +657,7 @@ uint8_t eSaveStruct(char name[])
     if (strncmp(name, current->name, NAME_SIZE) == 0)
     {
       //found desired node
-      eUpload(current->ptr, current->eAddress, current->size);
+      eUpload(current->ptr_to_data, current->address_on_eeprom, current->size);
       return 0;
     }
 
