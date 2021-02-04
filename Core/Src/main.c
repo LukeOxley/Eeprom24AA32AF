@@ -112,12 +112,12 @@ int main(void)
   uint8_t backList[] = {420,420,420};
   char letters[] = "Howdy partner, I hope you are swell";
 
-  eepromLinkStruct(&letters, sizeof(letters), "haj", 1, 0);
+  //eepromLinkStruct(&letters, sizeof(letters), "haj", 1, 0);
   //eLinkStruct(&letters, sizeof(letters), lName, 1);
   //eLinkStruct(&b, sizeof(b), bName, 2, 0);
-  eepromLinkStruct(&numList, sizeof(numList), "bup", 1, 0);
+  //eepromLinkStruct(&numList, sizeof(numList), "bup", 1, 0);
 
-  eepromLinkStruct(&backList, sizeof(backList), "fgh", 15, 0);
+  //eepromLinkStruct(&backList, sizeof(backList), "fgh", 15, 0);
   eepromCleanHeaders();
 
   //ewrite(10,10);

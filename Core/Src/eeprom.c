@@ -349,20 +349,18 @@ void loadHeaderEntries()
 //sort headers by increasing eaddress
 void sortHeaders()
 {
-  header_t *sort_location = g_headers;
   header_t temp; //temporary buffer
 
   for (int i = 0; i < g_numStructs; i++)
   {
     for (int j = 0; j < g_numStructs - i - 1; j++)
     {
-      if (sort_location->address_on_eeprom > (sort_location + 1)->address_on_eeprom)
+      if (g_headers[j].address_on_eeprom > g_headers[j + 1].address_on_eeprom)
       {
-        temp = *sort_location;
-        *sort_location = *(sort_location + 1);
-        *(sort_location + 1) = temp;
+        temp = g_headers[j + 1];
+        g_headers[j + 1] = g_headers[j];
+        g_headers[j] = temp;
       }
-      sort_location++;
     }
   }
 }
@@ -473,6 +471,7 @@ void eepromCleanHeaders()
       {
         g_headers[j] = g_headers[j + 1]; //intended to reach 1+
       }
+      i-=1; //indexes all shifted back one now
     }
   }
 }
@@ -548,8 +547,9 @@ void errorFound(eeprom_error_t error)
   case MAX_HEADER:
   case MAX_MEM:
   case HEADER_NOT_FOUND:
-    while (1)
-      ;
+    while (PER == GREAT)
+    {
+    }
     break;
   }
 }
