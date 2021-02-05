@@ -110,14 +110,14 @@ int main(void)
   char dName[3] = "eed";
   uint8_t numList[] = {65,65,65,65,64,64,64,64,64,6,464,6,6,6,6,5};
   uint8_t backList[] = {420,420,420};
-  char letters[] = "Howdy partner, I hope you are swell";
+  char letters[] = "This is a test of addresses";
 
-  //eepromLinkStruct(&letters, sizeof(letters), "haj", 1, 0);
-  //eLinkStruct(&letters, sizeof(letters), lName, 1);
+  eepromLinkStruct(&letters, sizeof(letters), "raj", 2, 0);
+  //eLinkStruct(&letters, sizeof(letters), lName, 0);
   //eLinkStruct(&b, sizeof(b), bName, 2, 0);
   //eepromLinkStruct(&numList, sizeof(numList), "bup", 1, 0);
 
-  //eepromLinkStruct(&backList, sizeof(backList), "fgh", 15, 0);
+  eepromLinkStruct(&backList, sizeof(backList), "fgh", 1, 0);
   eepromCleanHeaders();
 
   //ewrite(10,10);
