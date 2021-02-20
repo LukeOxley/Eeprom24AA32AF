@@ -99,7 +99,7 @@ int main(void)
 
 
 
-  eInitialize(&hi2c3, 4000, 0x50);
+  eepromInitialize(&hi2c3, 4000, 0x50);
   uint8_t a = 10;
   char aName[3] = "eea";
   uint8_t b = 20;
@@ -110,15 +110,15 @@ int main(void)
   char dName[3] = "eed";
   uint8_t numList[] = {65,65,65,65,64,64,64,64,64,6,464,6,6,6,6,5};
   uint8_t backList[] = {420,420,420};
-  char letters[] = "Howdy partner, I hope you are swell";
+  char letters[] = "This is a test of addresses";
 
-  eLinkStruct(&letters, sizeof(letters), "haj", 1, 0);
-  //eLinkStruct(&letters, sizeof(letters), lName, 1);
+  eepromLinkStruct(&letters, sizeof(letters), "raj", 2, 0);
+  //eLinkStruct(&letters, sizeof(letters), lName, 0);
   //eLinkStruct(&b, sizeof(b), bName, 2, 0);
-  eLinkStruct(&numList, sizeof(numList), "bup", 1, 0);
+  //eepromLinkStruct(&numList, sizeof(numList), "bup", 1, 0);
 
-  eLinkStruct(&backList, sizeof(backList), "fgh", 15, 0);
-  eCleanHeaders();
+  eepromLinkStruct(&backList, sizeof(backList), "fgh", 1, 0);
+  eepromCleanHeaders();
 
   //ewrite(10,10);
   //ewrite(50,50);
@@ -132,7 +132,7 @@ int main(void)
 
     if(g_dump)
     {
-      eDump(huart1);
+      eepromDump(huart1);
       g_dump = 0;
       HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
     }
